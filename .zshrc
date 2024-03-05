@@ -1,8 +1,5 @@
 export ZSH="$HOME/.oh-my-zsh"
-
-# See https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
-ZSH_THEME="Eastwood"
-
+ZSH_THEME="gozilla"
 # Plugins
 plugins=(
     git
@@ -16,3 +13,5 @@ code () { VSCODE_CWD="$PWD" open -n -b "com.microsoft.VSCode" --args $* ;}
 alias python=python3
 alias pip=pip3
 alias k=kubectl
+alias vim=nvim
+

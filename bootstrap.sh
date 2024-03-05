@@ -16,7 +16,7 @@ homedir=$1
 dotfiledir=${homedir}/dotfiles
 
 # list of files/folders to symlink in ${homedir}
-files="zshrc"
+files=("zshrc", "tmux.conf")
 
 # change to the dotfiles directory
 echo "Changing to the ${dotfiledir} directory"
@@ -32,3 +32,4 @@ done
 # Install Plugins
 git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
 
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
