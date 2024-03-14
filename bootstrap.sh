@@ -2,7 +2,6 @@
 ############################
 # This script creates symlinks from the home directory to any desired dotfiles in ${homedir}/dotfiles
 # And also installs Homebrew Packages
-# And sets Sublime preferences
 ############################
 
 if [ "$#" -ne 1 ]; then
@@ -16,7 +15,7 @@ homedir=$1
 dotfiledir=${homedir}/dotfiles
 
 # list of files/folders to symlink in ${homedir}
-files=("zshrc" "tmux.conf")
+files="zshrc tmux.conf"
 
 # change to the dotfiles directory
 echo "Changing to the ${dotfiledir} directory"

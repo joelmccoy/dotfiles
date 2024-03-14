@@ -6,5 +6,5 @@ Config/dotfiles for Linux/Mac Os
 cd ~
 git clone https://github.com/joelmccoy/dotfiles.git
 cd dotfiles
-bash boostrap.sh ~
+bash bootsrap.sh ~
 ```
