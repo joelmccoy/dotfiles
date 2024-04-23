@@ -4,6 +4,7 @@ ZSH_THEME="gozilla"
 plugins=(
     git
     zsh-autosuggestions
+    kubectl
 )
 
 source $ZSH/oh-my-zsh.sh
@@ -14,4 +15,7 @@ alias python=python3
 alias pip=pip3
 alias k=kubectl
 alias vim=nvim
+alias notes="(export CUR=$PWD; cd ~/Documents/Joel\'s\ Vault; nvim; cd $CUR)"
 
+# Add to path
+export PATH=$PATH:$HOME/go/bin
