@@ -6,6 +6,7 @@ plugins=(
     zsh-autosuggestions
     kubectl
     aws
+    docker
 )
 
 source $ZSH/oh-my-zsh.sh
