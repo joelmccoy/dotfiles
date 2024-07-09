@@ -15,7 +15,10 @@ alias python=python3
 alias pip=pip3
 alias k=kubectl
 alias vim=nvim
-alias notes="(export CUR=$PWD; cd ~/Documents/Joel\'s\ Vault; nvim; cd $CUR)"
+alias notes="(export CUR=$PWD; cd ~/notes; nvim; cd $CUR)"
 
 # Add to path
 export PATH=$PATH:$HOME/go/bin
+
+# Set vim keybindings
+bindkey -v
