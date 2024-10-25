@@ -20,7 +20,14 @@ alias k=kubectl
 alias vim=nvim
 alias notes="(export CUR=$PWD; cd '/Users/jmccoy/Library/Mobile Documents/iCloud~md~obsidian/Documents/brain'; nvim; cd $CUR)"
 alias brain="(export CUR=$PWD; cd '/Users/jmccoy/Library/Mobile Documents/iCloud~md~obsidian/Documents/brain'; lazygit; cd $CUR)"
-alias g='function _g() { cd ~/github/$1 && tmux new-session -d -s $1 "nvim" \; new-window -n lazygit "lazygit" \; attach; }; _g'
+
+alias g='function _g() { 
+    if tmux has-session -t $1 2>/dev/null; then
+        tmux attach-session -t $1; 
+    else 
+        cd ~/github/$1 && tmux new-session -d -s $1 "nvim" \; new-window -n lazygit "lazygit" \; attach; 
+    fi 
+}; _g'
 
 # Add to path
 export PATH=$PATH:$HOME/go/bin
