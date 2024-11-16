@@ -1,6 +1,6 @@
 export ZSH="$HOME/.oh-my-zsh"
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
-ZSH_THEME="gozilla"
+ZSH_THEME="simple"
 # Plugins
 plugins=(
     git
