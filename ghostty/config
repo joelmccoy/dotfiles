@@ -20,6 +20,9 @@ mouse-hide-while-typing = true
 confirm-close-surface = false
 shell-integration-features = no-cursor
 
+# Bell notifications
+bell-features = attention,title
+
 # Keybindings
 keybind = super+shift+h=previous_tab
 keybind = super+shift+l=next_tab
