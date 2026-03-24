@@ -1,10 +1,11 @@
 export ZSH="$HOME/.oh-my-zsh"
 export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
-ZSH_THEME="simple"
+ZSH_THEME=""  # using starship prompt instead
 # Plugins
 plugins=(
     git
     zsh-autosuggestions
+    zsh-syntax-highlighting
     kubectl
     aws
     docker
@@ -14,6 +15,9 @@ plugins=(
 PATH="$HOME/.local/bin:$PATH"
 
 source $ZSH/oh-my-zsh.sh
+
+# fzf keybindings (ctrl-r, ctrl-t, alt-c)
+source <(fzf --zsh)
 # oh-my-zsh git plugin aliases g=git, remove so our g() function works
 unalias g 2>/dev/null
 
@@ -29,6 +33,18 @@ alias python=python3
 alias pip=pip3
 alias k=kubectl
 alias vim=nvim
+alias cat=bat
+alias ls='eza --icons --git'
+alias ll='eza -la --icons --git'
+
+# Catppuccin Mocha theme for bat and fzf
+export BAT_THEME="Catppuccin Mocha"
+export FZF_DEFAULT_OPTS=" \
+--color=bg+:#313244,bg:#1e1e2e,spinner:#f5e0dc,hl:#f38ba8 \
+--color=fg:#cdd6f4,header:#f38ba8,info:#cba6f7,pointer:#f5e0dc \
+--color=marker:#b4befe,fg+:#cdd6f4,prompt:#cba6f7,hl+:#f38ba8 \
+--color=selected-bg:#45475a \
+--multi"
 
 # Worktree-based repo workflow
 # Usage:
@@ -228,6 +244,12 @@ function certinfo {
   fi
 }
 
+# Open/reattach dotfiles tmux session with nvim + claude
+alias dot='tmux has-session -t dotfiles 2>/dev/null && tmux attach-session -t dotfiles || tmux new-session -s dotfiles -c "$HOME/dotfiles" -n editor -d "nvim" \; new-window -n claude -c "$HOME/dotfiles" "claude" \; select-window -t editor \; attach-session -t dotfiles'
+
+# Open/reattach nvim config tmux session with nvim + claude
+alias nvc='tmux has-session -t nvim-config 2>/dev/null && tmux attach-session -t nvim-config || tmux new-session -s nvim-config -c "$HOME/.config/nvim" -n editor -d "nvim" \; new-window -n claude -c "$HOME/.config/nvim" "claude" \; select-window -t editor \; attach-session -t nvim-config'
+
 # Alias for killing all tmux sessions
 alias tkill='tmux ls 2>/dev/null | cut -d: -f1 | xargs -r -n1 tmux kill-session -t'
 
@@ -236,3 +258,6 @@ export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
 
 if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
+
+# Starship prompt
+eval "$(starship init zsh)"

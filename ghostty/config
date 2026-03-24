@@ -1,0 +1,25 @@
+font-family = JetBrainsMono Nerd Font
+font-size = 20
+window-inherit-font-size = false
+theme = Catppuccin Mocha
+
+# Visual
+window-padding-x = 10
+window-padding-y = 10
+cursor-style-blink = false
+background-opacity = 0.95
+background-blur-radius = 20
+
+# macOS
+macos-titlebar-style = transparent
+macos-option-as-alt = true
+
+# Behavior
+copy-on-select = clipboard
+mouse-hide-while-typing = true
+confirm-close-surface = false
+shell-integration-features = no-cursor
+
+# Keybindings
+keybind = super+shift+h=previous_tab
+keybind = super+shift+l=next_tab

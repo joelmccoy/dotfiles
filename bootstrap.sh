@@ -28,10 +28,20 @@ for file in ${files}; do
     ln -sf ${dotfiledir}/.${file} ${homedir}/.${file}
 done
 
+# Ghostty config
+mkdir -p ${homedir}/.config/ghostty
+echo "Creating symlink for Ghostty config."
+ln -sf ${dotfiledir}/ghostty/config ${homedir}/.config/ghostty/config
+
+# Starship config
+echo "Creating symlink for Starship config."
+ln -sf ${dotfiledir}/starship.toml ${homedir}/.config/starship.toml
+
 # Install Oh My Zsh
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
 # Install Plugins
 git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+git clone https://github.com/zsh-users/zsh-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
