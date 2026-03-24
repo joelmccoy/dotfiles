@@ -10,7 +10,12 @@ plugins=(
     docker
 )
 
+# Add local bin to path
+PATH="$HOME/.local/bin:$PATH"
+
 source $ZSH/oh-my-zsh.sh
+# oh-my-zsh git plugin aliases g=git, remove so our g() function works
+unalias g 2>/dev/null
 
 # Global Env Variables
 export KUBE_EDITOR="nvim" # set k9s editor to nvim
@@ -25,17 +30,83 @@ alias pip=pip3
 alias k=kubectl
 alias vim=nvim
 
-# Function for opening a tmux session for a github repo
-alias g='function _g() { 
-    if tmux has-session -t $1 2>/dev/null; then
-        tmux attach-session -t $1;
-    else 
-        cd ~/github/$1 && tmux new-session -s $1 -n editor -d "nvim" \; new-window -n lazygit "lazygit" \; attach-session -t $1;
-    fi 
-}; _g'
+# Worktree-based repo workflow
+# Usage:
+#   g repo       - pick a worktree via fzf, open nvim in it
+#   g repo init  - (re)create default worktrees
+DEFAULT_WORKTREES=(feat-1 feat-2 review-1 review-2 scratch)
 
-alias core='uds deploy k3d-core-demo:latest --confirm'
-alias slim='uds deploy k3d-slim-dev:latest --confirm'
+function g() {
+    local repo="$1"
+    local repo_dir="$HOME/github/$repo"
+
+    if [[ -z "$repo" ]]; then
+        echo "Usage: g <repo> [init]"
+        return 1
+    fi
+
+    if [[ ! -d "$repo_dir" ]]; then
+        echo "Repo not found: $repo_dir"
+        return 1
+    fi
+
+    cd "$repo_dir" || return 1
+
+    # Init: ensure default worktrees exist
+    if [[ "$2" == "init" ]] || [[ ! -d "$repo_dir.feat-1" ]]; then
+        echo "Setting up worktrees for $repo..."
+        local base_branch="main"
+        for wt in "${DEFAULT_WORKTREES[@]}"; do
+            if [[ ! -d "$repo_dir.$wt" ]]; then
+                git worktree add "$repo_dir.$wt" -b "$repo/$wt" "$base_branch" &>/dev/null \
+                    || git worktree add "$repo_dir.$wt" "$repo/$wt" &>/dev/null
+                echo "  created: $wt"
+            fi
+        done
+        [[ "$2" == "init" ]] && return 0
+    fi
+
+    # Build worktree list: main + all worktrees
+    local choices=()
+    local main_branch=$(git branch --show-current 2>/dev/null)
+    local main_changed=$(git status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+    local main_status=""
+    [[ "$main_changed" -gt 0 ]] && main_status=" [$main_changed changes]"
+    choices+=("main\t($main_branch)$main_status")
+    for wt in "${DEFAULT_WORKTREES[@]}"; do
+        local wt_dir="$repo_dir.$wt"
+        if [[ -d "$wt_dir" ]]; then
+            local branch=$(git -C "$wt_dir" branch --show-current 2>/dev/null)
+            local changed=$(git -C "$wt_dir" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+            local wt_status=""
+            [[ "$changed" -gt 0 ]] && wt_status=" [$changed changes]"
+            choices+=("$wt\t($branch)$wt_status")
+        fi
+    done
+
+    # Fuzzy pick a worktree
+    local pick
+    pick=$(printf '%b\n' "${choices[@]}" | column -t -s $'\t' | fzf --height=40% --reverse --prompt="$repo > ")
+    [[ -z "$pick" ]] && return 0
+
+    # Extract worktree name from selection
+    local wt_name="${pick%% *}"
+    local target_dir
+    if [[ "$wt_name" == "main" ]]; then
+        target_dir="$repo_dir"
+    else
+        target_dir="$repo_dir.$wt_name"
+    fi
+
+    # Session name: repo-worktree
+    local session_name="$repo-$wt_name"
+
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        tmux attach-session -t "$session_name"
+    else
+        tmux new-session -s "$session_name" -c "$target_dir" -n editor -d "nvim" \; new-window -n claude -c "$target_dir" "claude" \; select-window -t editor \; attach-session -t "$session_name"
+    fi
+}
 
 # Setup Bash my AWS
 export PATH="$PATH:${BMA_HOME:-$HOME/.bash-my-aws}/bin"
@@ -157,6 +228,11 @@ function certinfo {
   fi
 }
 
+# Alias for killing all tmux sessions
+alias tkill='tmux ls 2>/dev/null | cut -d: -f1 | xargs -r -n1 tmux kill-session -t'
 
-# Added by Windsurf
-export PATH="/Users/jmccoy/.codeium/windsurf/bin:$PATH"
+export NVM_DIR="$HOME/.nvm"
+[ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
+[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
+
+if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
