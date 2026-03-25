@@ -6,6 +6,8 @@ theme = Catppuccin Mocha
 # Visual
 window-padding-x = 10
 window-padding-y = 10
+window-padding-balance = true
+window-padding-color = extend
 cursor-style-blink = false
 background-opacity = 0.95
 background-blur-radius = 20
