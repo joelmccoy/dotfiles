@@ -244,34 +244,22 @@ function certinfo {
   fi
 }
 
-# Fuzzy-find and open GitHub repos in Chrome (defenseunicorns + uds-packages)
+# Fuzzy-find and open GitHub repos in Chrome
+# Searches defenseunicorns + uds-packages orgs live via GitHub API
 GH_REPO_HISTORY="$HOME/.gh_repo_history"
 function ghr() {
-    local cache_file="/tmp/gh_repos_cache"
-    local cache_ttl=3600  # 1 hour
-
-    # Refresh cache if stale or missing
-    if [[ ! -f "$cache_file" ]] || [[ $(($(date +%s) - $(stat -f%m "$cache_file"))) -gt $cache_ttl ]]; then
-        echo "Fetching repos..."
-        { gh repo list defenseunicorns --limit 500 --json nameWithOwner -q '.[].nameWithOwner'
-          gh repo list uds-packages --limit 500 --json nameWithOwner -q '.[].nameWithOwner'
-        } | sort -u > "$cache_file"
-    fi
-
-    # Build MRU-ordered list: recent picks first, then the rest
-    local picks
-    if [[ -f "$GH_REPO_HISTORY" ]]; then
-        # Recent repos (most recent first), then remaining repos
-        picks=$(awk 'NR==FNR{seen[$0]; print; next} !($0 in seen)' "$GH_REPO_HISTORY" "$cache_file")
-    else
-        picks=$(cat "$cache_file")
-    fi
+    local search_cmd='gh search repos --limit=50 --json fullName -q ".[].fullName" {q}'
+    local history_list=""
+    [[ -f "$GH_REPO_HISTORY" ]] && history_list=$(cat "$GH_REPO_HISTORY")
 
     local selection
-    selection=$(echo "$picks" | fzf --height=40% --reverse --prompt="GitHub repo > ")
+    selection=$(echo "$history_list" | fzf --height=40% --reverse --prompt="GitHub repo > " \
+        --header="Type to search GitHub API" \
+        --bind "change:reload:$search_cmd || true" \
+        --phony)
     [[ -z "$selection" ]] && return 0
 
-    # Update history: put selection at top, deduplicate, keep last 50
+    # Update MRU history
     { echo "$selection"; [[ -f "$GH_REPO_HISTORY" ]] && grep -v "^${selection}$" "$GH_REPO_HISTORY"; } | head -50 > "${GH_REPO_HISTORY}.tmp"
     mv "${GH_REPO_HISTORY}.tmp" "$GH_REPO_HISTORY"
 
