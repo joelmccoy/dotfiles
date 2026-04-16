@@ -129,6 +129,9 @@ export PATH="$PATH:${BMA_HOME:-$HOME/.bash-my-aws}/bin"
 export BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT=true
 source ${BMA_HOME:-$HOME/.bash-my-aws}/aliases
 
+# Custom completions (must be before compinit)
+fpath=(~/.zsh/completions $fpath)
+
 # For ZSH users, uncomment the following two lines:
 autoload -U +X compinit && compinit
 autoload -U +X bashcompinit && bashcompinit
@@ -274,6 +277,39 @@ alias nvc='tmux has-session -t nvim-config 2>/dev/null && tmux attach-session -t
 
 # Alias for killing all tmux sessions
 alias tkill='tmux ls 2>/dev/null | cut -d: -f1 | xargs -r -n1 tmux kill-session -t'
+
+# Interactive tmux session killer (multi-select with Tab, Enter to kill)
+tks() {
+  local lines=()
+  while IFS='|' read -r name attached windows; do
+    local pane_path=$(tmux display -t "$name" -p '#{pane_current_path}' 2>/dev/null)
+    local branch=$(git -C "$pane_path" branch --show-current 2>/dev/null)
+    local state=""
+    [[ "$attached" == "1" ]] && state="● attached" || state="○ detached"
+    [[ -n "$branch" ]] && branch=" $branch" || branch=""
+    printf -v line "%-28s  %s  %-14s  %dw" "$name" "$state" "$branch" "$windows"
+    lines+=("$line")
+  done < <(tmux ls -F '#{session_name}|#{session_attached}|#{session_windows}' 2>/dev/null)
+
+  [[ ${#lines[@]} -eq 0 ]] && { echo "No tmux sessions running."; return 0; }
+
+  local selected
+  selected=$(printf '%s\n' "${lines[@]}" | fzf \
+    --multi \
+    --ansi \
+    --header=$'Session                       Status       Branch          Win\n───────────────────────────────────────────────────────────────' \
+    --prompt="Kill session(s) > " \
+    --marker="✗" \
+    --color='marker:red,prompt:yellow,header:dim' \
+    --preview='tmux capture-pane -t $(echo {} | awk "{print \$1}") -p 2>/dev/null || echo "No preview"' \
+    --preview-window=right:50%:wrap) || return 0
+
+  local killed=0
+  echo "$selected" | awk '{print $1}' | while read -r s; do
+    tmux kill-session -t "$s" && echo "  ✗ $s"
+    ((killed++))
+  done
+}
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
