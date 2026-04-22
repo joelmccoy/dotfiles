@@ -311,6 +311,27 @@ tks() {
   done
 }
 
+# Fuzzy-browse tar archive, preview + view selected file (no extraction to disk)
+# Supports .tar, .tar.gz, .tar.zst, .tar.bz2, .tar.xz (bsdtar auto-detects)
+# Usage: tarp <archive>
+function tarp() {
+    local archive="$1"
+    if [[ -z "$archive" || ! -f "$archive" ]]; then
+        echo "Usage: tarp <archive>"
+        return 1
+    fi
+
+    local file
+    file=$(tar -tf "$archive" 2>/dev/null \
+        | grep -v '/$' \
+        | fzf --height=80% --reverse \
+              --prompt="$(basename "$archive") > " \
+              --preview="tar -xOf '$archive' {} 2>/dev/null | bat --color=always --style=plain --file-name={} 2>/dev/null") || return 0
+
+    [[ -z "$file" ]] && return 0
+    tar -xOf "$archive" "$file" | bat --file-name="$file" --paging=always
+}
+
 export NVM_DIR="$HOME/.nvm"
 [ -s "/opt/homebrew/opt/nvm/nvm.sh" ] && \. "/opt/homebrew/opt/nvm/nvm.sh"  # This loads nvm
 [ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm"  # This loads nvm bash_completion
