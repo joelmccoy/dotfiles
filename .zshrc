@@ -311,25 +311,89 @@ tks() {
   done
 }
 
-# Fuzzy-browse tar archive, preview + view selected file (no extraction to disk)
-# Supports .tar, .tar.gz, .tar.zst, .tar.bz2, .tar.xz (bsdtar auto-detects)
-# Usage: tarp <archive>
-function tarp() {
+# Fuzzy-browse an OCI image archive (oci-layout tarball, any compression).
+# Finds the oci-layout root (handles nested "oci/" dir like UDS bundles),
+# walks index -> manifests recursively, lists layers by title annotation,
+# previews/reads the selected blob with bat.
+# Usage: ocitar <oci-archive>
+function ocitar() {
     local archive="$1"
     if [[ -z "$archive" || ! -f "$archive" ]]; then
-        echo "Usage: tarp <archive>"
+        echo "Usage: ocitar <oci-archive>"
         return 1
     fi
 
-    local file
-    file=$(tar -tf "$archive" 2>/dev/null \
-        | grep -v '/$' \
-        | fzf --height=80% --reverse \
-              --prompt="$(basename "$archive") > " \
-              --preview="tar -xOf '$archive' {} 2>/dev/null | bat --color=always --style=plain --file-name={} 2>/dev/null") || return 0
+    local tmp
+    tmp=$(mktemp -d -t ocitar.XXXXXX) || return 1
+    trap "rm -rf '$tmp'" EXIT INT TERM
 
-    [[ -z "$file" ]] && return 0
-    tar -xOf "$archive" "$file" | bat --file-name="$file" --paging=always
+    if ! tar -xf "$archive" -C "$tmp" 2>/dev/null; then
+        echo "Failed to extract $archive"
+        return 1
+    fi
+
+    # Locate oci-layout root: index.json sibling to blobs/ dir
+    local idx root
+    idx=$(find "$tmp" -maxdepth 4 -type f -name index.json 2>/dev/null | while read -r f; do
+        [[ -d "${f:h}/blobs" ]] && { echo "$f"; break; }
+    done)
+    if [[ -z "$idx" ]]; then
+        echo "Not an OCI layout (no index.json + blobs/ found)"
+        return 1
+    fi
+    root="${idx:h}"
+
+    # Recursive walker: emits "label<TAB>blob_path" per layer. Descends into
+    # nested image-indexes, prefixing labels with the manifest ref.name so
+    # same-named files in different packages stay distinguishable.
+    _ocitar_walk() {
+        local blob="$1" prefix="$2"
+        [[ -f "$blob" ]] || return
+        local media
+        media=$(jq -r '.mediaType // ""' "$blob" 2>/dev/null)
+        case "$media" in
+            *image.index*|*manifest.list*)
+                jq -r '.manifests[] |
+                    ((.annotations["org.opencontainers.image.ref.name"]
+                      // .artifactType
+                      // (.digest | .[7:19]))
+                     + "\t" + .digest)' "$blob" \
+                | while IFS=$'\t' read -r label digest; do
+                    _ocitar_walk "$root/blobs/${digest%%:*}/${digest#*:}" "${prefix}${label}/"
+                done
+                ;;
+            *)
+                jq -r --arg p "$prefix" --arg b "$root/blobs/" '
+                    .layers[]? |
+                    ($p + (.annotations["org.opencontainers.image.title"]
+                           // .annotations["org.opencontainers.artifact.title"]
+                           // .digest))
+                    + "\t" + ($b + (.digest | sub(":"; "/")))
+                ' "$blob"
+                ;;
+        esac
+    }
+
+    local rows
+    rows=$(_ocitar_walk "$idx" "")
+    unset -f _ocitar_walk
+
+    if [[ -z "$rows" ]]; then
+        echo "No layers found in OCI manifests"
+        return 1
+    fi
+
+    local pick
+    pick=$(printf '%s\n' "$rows" | fzf --height=80% --reverse \
+        --delimiter=$'\t' --with-nth=1 \
+        --prompt="$(basename "$archive") > " \
+        --preview='bat --color=always --style=plain {2}' \
+        --preview-window=right:60%:wrap) || return 0
+    [[ -z "$pick" ]] && return 0
+
+    local title="${pick%%$'\t'*}"
+    local blob="${pick##*$'\t'}"
+    bat --file-name="$title" --paging=always "$blob"
 }
 
 export NVM_DIR="$HOME/.nvm"
