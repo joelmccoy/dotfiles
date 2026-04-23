@@ -311,37 +311,16 @@ tks() {
   done
 }
 
-# Fuzzy-browse an OCI image archive (oci-layout tarball, any compression).
-# Finds the oci-layout root (handles nested "oci/" dir like UDS bundles),
-# walks index -> manifests recursively, lists layers by title annotation,
-# previews/reads the selected blob with bat.
-# Usage: ocitar <oci-archive>
-function ocitar() {
-    local archive="$1"
-    if [[ -z "$archive" || ! -f "$archive" ]]; then
-        echo "Usage: ocitar <oci-archive>"
+# Fuzzy-browse a prepared oci-layout directory. Walks index -> manifests
+# recursively, lists layers by title annotation, previews/reads with bat.
+# Used by both ocitar (local archive) and ocitarr (remote ref).
+function _ocitar_browse() {
+    local root="$1" label="$2"
+    local idx="$root/index.json"
+    [[ -f "$idx" && -d "$root/blobs" ]] || {
+        echo "Not an OCI layout: $root"
         return 1
-    fi
-
-    local tmp
-    tmp=$(mktemp -d -t ocitar.XXXXXX) || return 1
-    trap "rm -rf '$tmp'" EXIT INT TERM
-
-    if ! tar -xf "$archive" -C "$tmp" 2>/dev/null; then
-        echo "Failed to extract $archive"
-        return 1
-    fi
-
-    # Locate oci-layout root: index.json sibling to blobs/ dir
-    local idx root
-    idx=$(find "$tmp" -maxdepth 4 -type f -name index.json 2>/dev/null | while read -r f; do
-        [[ -d "${f:h}/blobs" ]] && { echo "$f"; break; }
-    done)
-    if [[ -z "$idx" ]]; then
-        echo "Not an OCI layout (no index.json + blobs/ found)"
-        return 1
-    fi
-    root="${idx:h}"
+    }
 
     # Recursive walker: emits "label<TAB>blob_path" per layer. Descends into
     # nested image-indexes, prefixing labels with the manifest ref.name so
@@ -358,8 +337,8 @@ function ocitar() {
                       // .artifactType
                       // (.digest | .[7:19]))
                      + "\t" + .digest)' "$blob" \
-                | while IFS=$'\t' read -r label digest; do
-                    _ocitar_walk "$root/blobs/${digest%%:*}/${digest#*:}" "${prefix}${label}/"
+                | while IFS=$'\t' read -r sub digest; do
+                    _ocitar_walk "$root/blobs/${digest%%:*}/${digest#*:}" "${prefix}${sub}/"
                 done
                 ;;
             *)
@@ -386,7 +365,7 @@ function ocitar() {
     local pick
     pick=$(printf '%s\n' "$rows" | fzf --height=80% --reverse \
         --delimiter=$'\t' --with-nth=1 \
-        --prompt="$(basename "$archive") > " \
+        --prompt="$label > " \
         --preview='bat --color=always --style=plain {2}' \
         --preview-window=right:60%:wrap) || return 0
     [[ -z "$pick" ]] && return 0
@@ -394,6 +373,55 @@ function ocitar() {
     local title="${pick%%$'\t'*}"
     local blob="${pick##*$'\t'}"
     bat --file-name="$title" --paging=always "$blob"
+}
+
+# Fuzzy-browse an OCI image: local oci-layout archive (any compression) or
+# remote registry reference. Auto-detects: existing file => extract, else
+# treat as ref and crane pull. Handles nested "oci/" dir like UDS bundles.
+# Usage: ocipeek <oci-archive|registry/repo:tag|@digest>
+function ocipeek() {
+    local src="$1"
+    if [[ -z "$src" ]]; then
+        echo "Usage: ocipeek <oci-archive|oci-ref>"
+        return 1
+    fi
+
+    local tmp
+    tmp=$(mktemp -d -t ocipeek.XXXXXX) || return 1
+    trap "rm -rf '$tmp'" EXIT INT TERM
+
+    local root label
+    if [[ -f "$src" ]]; then
+        if ! tar -xf "$src" -C "$tmp" 2>/dev/null; then
+            echo "Failed to extract $src"
+            return 1
+        fi
+        # Locate oci-layout root: index.json sibling to blobs/ dir
+        local idx
+        idx=$(find "$tmp" -maxdepth 4 -type f -name index.json 2>/dev/null | while read -r f; do
+            [[ -d "${f:h}/blobs" ]] && { echo "$f"; break; }
+        done)
+        if [[ -z "$idx" ]]; then
+            echo "Not an OCI layout (no index.json + blobs/ found)"
+            return 1
+        fi
+        root="${idx:h}"
+        label="$(basename "$src")"
+    else
+        if ! command -v crane >/dev/null 2>&1; then
+            echo "crane not found (brew install crane)"
+            return 1
+        fi
+        echo "Pulling $src ..." >&2
+        if ! crane pull --format=oci "$src" "$tmp"; then
+            echo "crane pull failed"
+            return 1
+        fi
+        root="$tmp"
+        label="$src"
+    fi
+
+    _ocitar_browse "$root" "$label"
 }
 
 export NVM_DIR="$HOME/.nvm"
