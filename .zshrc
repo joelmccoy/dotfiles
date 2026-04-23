@@ -37,6 +37,10 @@ alias cat=bat
 alias ls='eza --icons --git'
 alias ll='eza -la --icons --git'
 
+# Disable gh CLI telemetry (requires gh >= 2.91.0; takes precedence over config)
+# https://cli.github.com/telemetry
+export GH_TELEMETRY=disabled
+
 # Catppuccin Mocha theme for bat and fzf
 export BAT_THEME="Catppuccin Mocha"
 export FZF_DEFAULT_OPTS=" \
