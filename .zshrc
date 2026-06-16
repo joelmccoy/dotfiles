@@ -436,3 +436,4 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
 
 # Starship prompt
 eval "$(starship init zsh)"
+eval "$(~/.local/bin/mise activate zsh)"
