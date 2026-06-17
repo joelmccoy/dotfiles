@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+
+# Emit a terminal bell for terminal/tab attention without playing audio.
+emulate -L zsh
+
+function _terminal_alert_tty() {
+    local tty="$1"
+    [[ -n "$tty" && -w "$tty" ]] || return 1
+    { printf '\a' > "$tty" } 2>/dev/null
+}
+
+sent=0
+
+if [[ -n "${TMUX_PANE:-}" ]] && command -v tmux >/dev/null 2>&1; then
+    typeset -A seen_ttys
+
+    pane_session="$(tmux display-message -p -t "$TMUX_PANE" '#{session_name}' 2>/dev/null)"
+    pane_tty="$(tmux display-message -p -t "$TMUX_PANE" '#{pane_tty}' 2>/dev/null)"
+    client_rows="$(tmux list-clients -F '#{client_tty}	#{client_session}' 2>/dev/null)"
+
+    if [[ -n "$pane_tty" ]]; then
+        _terminal_alert_tty "$pane_tty" && sent=1
+        seen_ttys[$pane_tty]=1
+    fi
+
+    for row in ${(f)client_rows}; do
+        tty="${row%%	*}"
+        session="${row#*	}"
+        [[ "$session" == "$pane_session" ]] || continue
+        [[ -n "$tty" ]] || continue
+        [[ -z "${seen_ttys[$tty]:-}" ]] || continue
+        seen_ttys[$tty]=1
+        _terminal_alert_tty "$tty" && sent=1
+    done
+fi
+
+if (( ! sent )); then
+    { printf '\a' > /dev/tty } 2>/dev/null && sent=1
+fi
+
+(( sent )) || printf '\a'
