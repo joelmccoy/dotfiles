@@ -33,6 +33,18 @@ mkdir -p ${homedir}/.config/ghostty
 echo "Creating symlink for Ghostty config."
 ln -sf ${dotfiledir}/ghostty/config ${homedir}/.config/ghostty/config
 
+# cmux config and workflow scripts
+mkdir -p ${homedir}/.config/cmux ${homedir}/.local/bin
+echo "Creating symlink for cmux config."
+ln -sf ${dotfiledir}/cmux/cmux.json ${homedir}/.config/cmux/cmux.json
+echo "Creating symlink for cmux dev workflow."
+ln -sf ${dotfiledir}/scripts/cmux-dev-worktree ${homedir}/.local/bin/cmux-dev-worktree
+
+# OpenCode config
+mkdir -p ${homedir}/.config/opencode
+echo "Creating symlink for OpenCode config."
+ln -sf ${dotfiledir}/opencode/opencode.jsonc ${homedir}/.config/opencode/opencode.jsonc
+
 # Starship config
 echo "Creating symlink for Starship config."
 ln -sf ${dotfiledir}/starship.toml ${homedir}/.config/starship.toml

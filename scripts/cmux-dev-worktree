@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+state_file() {
+  local id="${CMUX_WORKSPACE_ID:-manual}"
+  id="${id//[^A-Za-z0-9_.-]/_}"
+  printf '%s/cmux-dev-%s.dir\n' "${TMPDIR:-/tmp}" "$id"
+}
+
+expand_root() {
+  local root="$1"
+  case "$root" in
+    '~') printf '%s\n' "$HOME" ;;
+    '~/'*) printf '%s/%s\n' "$HOME" "${root#~/}" ;;
+    *) printf '%s\n' "$root" ;;
+  esac
+}
+
+repo_roots() {
+  if [[ -n "${CMUX_DEV_REPO_ROOTS:-}" ]]; then
+    IFS=':' read -r -a roots <<< "$CMUX_DEV_REPO_ROOTS"
+  else
+    roots=("$HOME/github" "$HOME/git" "$HOME/dotfiles")
+  fi
+
+  for root in "${roots[@]}"; do
+    root="$(expand_root "$root")"
+    [[ -d "$root" ]] && printf '%s\n' "$root"
+  done
+}
+
+has_worktree_ancestor() {
+  local repo="$1"
+  local root="$2"
+  local dir="$repo"
+
+  while [[ "$dir" != "$root" && "$dir" != "/" ]]; do
+    # Linked worktrees have a .git file; prune any nested repos below them.
+    [[ -f "$dir/.git" ]] && return 0
+    dir="$(dirname "$dir")"
+  done
+
+  return 1
+}
+
+list_repos() {
+  local max_depth="${CMUX_DEV_MAX_DEPTH:-3}"
+  local worktree_root="${CMUX_DEV_WORKTREE_ROOT:-$HOME/worktrees}"
+
+  while IFS= read -r root; do
+    find "$root" -maxdepth "$max_depth" \
+      \( -name node_modules -o -name .venv -o -name .direnv -o -name target -o -name .terraform \) -prune -o \
+      \( -path '*/.git' -type d -o -name .git -type f \) \
+      -not -path "$worktree_root/*" \
+      -print 2>/dev/null | while IFS= read -r git_path; do
+        repo="$(dirname "$git_path")"
+        [[ -f "$repo/.git" ]] && continue
+        has_worktree_ancestor "$repo" "$root" && continue
+        printf '%s\n' "$repo"
+      done
+  done < <(repo_roots) | sort -u
+}
+
+pick_repo() {
+  local repo
+  repo="$(list_repos | fzf --prompt='repo> ' --height=80% --border --reverse)"
+  [[ -n "$repo" ]] || exit 1
+  printf '%s\n' "$repo"
+}
+
+list_branches() {
+  local repo="$1"
+  git -C "$repo" for-each-ref --format='%(refname:short)' refs/heads refs/remotes \
+    | sed '/\/HEAD$/d' \
+    | sort -u
+}
+
+pick_branch() {
+  local repo="$1"
+  local branch
+  branch="$(list_branches "$repo" | fzf --prompt='branch> ' --height=80% --border --reverse)"
+  [[ -n "$branch" ]] || exit 1
+  printf '%s\n' "$branch"
+}
+
+reorder_surfaces() {
+  command -v cmux >/dev/null 2>&1 || return 0
+  [[ -n "${CMUX_WORKSPACE_ID:-}" ]] || return 0
+
+  # cmux creates these terminals concurrently, so normalize tab order by title.
+  local names=(nvim lazygit Claude OpenCode Shell)
+  local i name surface
+
+  sleep 0.5
+  for i in "${!names[@]}"; do
+    name="${names[$i]}"
+    surface="$(cmux list-pane-surfaces --workspace "$CMUX_WORKSPACE_ID" 2>/dev/null | awk -v n="$name" '$0 ~ n { print $1; exit }')"
+    [[ -n "$surface" ]] || continue
+    cmux reorder-surface --workspace "$CMUX_WORKSPACE_ID" --surface "$surface" --index "$((i + 1))" --focus false >/dev/null 2>&1 || true
+  done
+}
+
+branch_slug() {
+  printf '%s\n' "$1" | sed 's#/#__#g; s#[^A-Za-z0-9._-]#-#g'
+}
+
+worktree_for_branch() {
+  local repo="$1"
+  local branch="$2"
+  git -C "$repo" worktree list --porcelain \
+    | awk -v b="refs/heads/$branch" '
+      /^worktree / { path=substr($0, 10) }
+      /^branch / && substr($0, 8) == b { print path; found=1 }
+      END { exit found ? 0 : 1 }
+    '
+}
+
+create_or_reuse_worktree() {
+  local repo="$1"
+  local selected="$2"
+  local remote=""
+  local branch="$selected"
+
+  if [[ "$selected" == */* ]] && git -C "$repo" show-ref --verify --quiet "refs/remotes/$selected"; then
+    remote="$selected"
+    branch="${selected#*/}"
+  fi
+
+  local existing=""
+  if existing="$(worktree_for_branch "$repo" "$branch" 2>/dev/null)" && [[ -n "$existing" ]]; then
+    printf '%s\n' "$existing"
+    return 0
+  fi
+
+  local repo_name slug base dir
+  repo_name="$(basename "$repo")"
+  slug="$(branch_slug "$branch")"
+  base="${CMUX_DEV_WORKTREE_ROOT:-$HOME/worktrees}/$repo_name"
+  dir="$base/$slug"
+
+  if [[ -e "$dir" ]]; then
+    if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    printf 'Refusing to use existing non-worktree path: %s\n' "$dir" >&2
+    exit 1
+  fi
+
+  mkdir -p "$base"
+
+  if git -C "$repo" show-ref --verify --quiet "refs/heads/$branch"; then
+    git -C "$repo" worktree add "$dir" "$branch" >/dev/null
+  elif [[ -n "$remote" ]]; then
+    git -C "$repo" worktree add --track -b "$branch" "$dir" "$remote" >/dev/null
+  else
+    git -C "$repo" worktree add -b "$branch" "$dir" >/dev/null
+  fi
+
+  printf '%s\n' "$dir"
+}
+
+select_worktree() {
+  command -v fzf >/dev/null || { printf 'fzf is required.\n' >&2; exit 1; }
+
+  local repo branch dir state
+  state="$(state_file)"
+  rm -f "$state"
+
+  repo="$(pick_repo)"
+  printf 'Fetching %s...\n' "$repo"
+  git -C "$repo" fetch --prune --quiet || true
+
+  branch="$(pick_branch "$repo")"
+  dir="$(create_or_reuse_worktree "$repo" "$branch")"
+
+  printf '%s\n' "$dir" > "$state"
+  printf 'Worktree: %s\n' "$dir"
+  if command -v cmux >/dev/null 2>&1 && [[ -n "${CMUX_WORKSPACE_ID:-}" ]]; then
+    cmux workspace-action --workspace "$CMUX_WORKSPACE_ID" --action rename --title "$(basename "$repo"):$branch" >/dev/null 2>&1 || true
+    cmux workspace-action --workspace "$CMUX_WORKSPACE_ID" --action set-description --description "$dir" >/dev/null 2>&1 || true
+    reorder_surfaces
+  fi
+  cd "$dir"
+  exec "${SHELL:-/bin/zsh}" -l
+}
+
+wait_for_worktree() {
+  local cmd="$1"
+  local state dir
+  state="$(state_file)"
+  printf 'Waiting for worktree selection...\n'
+  while [[ ! -s "$state" ]]; do sleep 0.2; done
+  dir="$(cat "$state")"
+  cd "$dir"
+
+  case "$cmd" in
+    nvim) exec nvim . ;;
+    lazygit) exec lazygit ;;
+    claude) exec claude ;;
+    opencode) exec opencode ;;
+    shell) exec "${SHELL:-/bin/zsh}" -l ;;
+    *) printf 'Unknown command: %s\n' "$cmd" >&2; exit 2 ;;
+  esac
+}
+
+case "${1:---select}" in
+  --select) select_worktree ;;
+  --wait) wait_for_worktree "${2:-shell}" ;;
+  --list-repos) list_repos ;;
+  *) printf 'Usage: %s [--select|--wait nvim|lazygit|claude|opencode|shell]\n' "$0" >&2; exit 2 ;;
+esac
