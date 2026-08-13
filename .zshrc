@@ -124,7 +124,7 @@ function g() {
     if tmux has-session -t "$session_name" 2>/dev/null; then
         tmux attach-session -t "$session_name"
     else
-        tmux new-session -s "$session_name" -c "$target_dir" -n editor -d "nvim" \; new-window -n codex -c "$target_dir" "codex" \; new-window -n git -c "$target_dir" "lazygit" \; select-window -t editor \; attach-session -t "$session_name"
+        tmux new-session -s "$session_name" -c "$target_dir" -n editor -d "nvim" \; new-window -n pi -c "$target_dir" "pi" \; new-window -n git -c "$target_dir" "lazygit" \; select-window -t editor \; attach-session -t "$session_name"
     fi
 }
 
@@ -273,11 +273,11 @@ function ghr() {
     open -a "Google Chrome" "https://github.com/$selection"
 }
 
-# Open/reattach dotfiles tmux session with nvim + codex
-alias dot='tmux has-session -t dotfiles 2>/dev/null && tmux attach-session -t dotfiles || tmux new-session -s dotfiles -c "$HOME/dotfiles" -n editor -d "nvim" \; new-window -n codex -c "$HOME/dotfiles" "codex" \; new-window -n git -c "$HOME/dotfiles" "lazygit" \; select-window -t editor \; attach-session -t dotfiles'
+# Open/reattach dotfiles tmux session with nvim + pi
+alias dot='tmux has-session -t dotfiles 2>/dev/null && tmux attach-session -t dotfiles || tmux new-session -s dotfiles -c "$HOME/dotfiles" -n editor -d "nvim" \; new-window -n pi -c "$HOME/dotfiles" "pi" \; new-window -n git -c "$HOME/dotfiles" "lazygit" \; select-window -t editor \; attach-session -t dotfiles'
 
-# Open/reattach nvim config tmux session with nvim + codex
-alias nvc='tmux has-session -t nvim-config 2>/dev/null && tmux attach-session -t nvim-config || tmux new-session -s nvim-config -c "$HOME/.config/nvim" -n editor -d "nvim" \; new-window -n codex -c "$HOME/.config/nvim" "codex" \; new-window -n git -c "$HOME/.config/nvim" "lazygit" \; select-window -t editor \; attach-session -t nvim-config'
+# Open/reattach nvim config tmux session with nvim + pi
+alias nvc='tmux has-session -t nvim-config 2>/dev/null && tmux attach-session -t nvim-config || tmux new-session -s nvim-config -c "$HOME/.config/nvim" -n editor -d "nvim" \; new-window -n pi -c "$HOME/.config/nvim" "pi" \; new-window -n git -c "$HOME/.config/nvim" "lazygit" \; select-window -t editor \; attach-session -t nvim-config'
 
 # Alias for killing all tmux sessions
 alias tkill='tmux ls 2>/dev/null | cut -d: -f1 | xargs -r -n1 tmux kill-session -t'
