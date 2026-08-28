@@ -41,6 +41,12 @@ echo "Creating symlink for OpenCode config."
 rm -rf "${homedir}/.config/opencode/opencode.jsonc"
 ln -s "${dotfiledir}/opencode/opencode.jsonc" "${homedir}/.config/opencode/opencode.jsonc"
 
+# LazyGit config
+mkdir -p "${homedir}/.config/lazygit"
+echo "Creating symlink for LazyGit config."
+rm -rf "${homedir}/.config/lazygit/config.yml"
+ln -s "${dotfiledir}/lazygit/config.yml" "${homedir}/.config/lazygit/config.yml"
+
 # Starship config
 mkdir -p "${homedir}/.config"
 echo "Creating symlink for Starship config."
