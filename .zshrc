@@ -128,20 +128,10 @@ function g() {
     fi
 }
 
-# Setup Bash my AWS
-export PATH="$PATH:${BMA_HOME:-$HOME/.bash-my-aws}/bin"
-export BMA_COLUMNISE_ONLY_WHEN_TERMINAL_PRESENT=true
-source ${BMA_HOME:-$HOME/.bash-my-aws}/aliases
-
 # Custom completions (must be before compinit)
 fpath=(~/.zsh/completions $fpath)
 
-# For ZSH users, uncomment the following two lines:
 autoload -U +X compinit && compinit
-autoload -U +X bashcompinit && bashcompinit
-
-source ${BMA_HOME:-$HOME/.bash-my-aws}/bash_completion.sh
-
 
 # Add go libs to path
 export PATH=$PATH:$HOME/go/bin
@@ -436,4 +426,6 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
 
 # Starship prompt
 eval "$(starship init zsh)"
-eval "$(~/.local/bin/mise activate zsh)"
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
+fi

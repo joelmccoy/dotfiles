@@ -22,31 +22,43 @@ echo "Changing to the ${dotfiledir} directory"
 cd ${dotfiledir}
 echo "...done"
 
-# create symlinks (will overwrite old dotfiles)
+# create symlinks (overwrite existing files/directories/symlinks)
 for file in ${files}; do
     echo "Creating symlink to $file in home directory."
-    ln -sf ${dotfiledir}/.${file} ${homedir}/.${file}
+    rm -rf "${homedir}/.${file}"
+    ln -s "${dotfiledir}/.${file}" "${homedir}/.${file}"
 done
 
 # Ghostty config
-mkdir -p ${homedir}/.config/ghostty
+mkdir -p "${homedir}/.config/ghostty"
 echo "Creating symlink for Ghostty config."
-ln -sf ${dotfiledir}/ghostty/config ${homedir}/.config/ghostty/config
+rm -rf "${homedir}/.config/ghostty/config"
+ln -s "${dotfiledir}/ghostty/config" "${homedir}/.config/ghostty/config"
 
 # OpenCode config
-mkdir -p ${homedir}/.config/opencode
+mkdir -p "${homedir}/.config/opencode"
 echo "Creating symlink for OpenCode config."
-ln -sf ${dotfiledir}/opencode/opencode.jsonc ${homedir}/.config/opencode/opencode.jsonc
+rm -rf "${homedir}/.config/opencode/opencode.jsonc"
+ln -s "${dotfiledir}/opencode/opencode.jsonc" "${homedir}/.config/opencode/opencode.jsonc"
 
 # Starship config
+mkdir -p "${homedir}/.config"
 echo "Creating symlink for Starship config."
-ln -sf ${dotfiledir}/starship.toml ${homedir}/.config/starship.toml
+rm -rf "${homedir}/.config/starship.toml"
+ln -s "${dotfiledir}/starship.toml" "${homedir}/.config/starship.toml"
 
-# Install Oh My Zsh
-sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+# Install Oh My Zsh (overwrite existing install, keep our .zshrc symlink)
+export ZSH="${homedir}/.oh-my-zsh"
+rm -rf "${ZSH}"
+RUNZSH=no CHSH=no KEEP_ZSHRC=yes sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 
-# Install Plugins
-git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-git clone https://github.com/zsh-users/zsh-syntax-highlighting ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
+# Install Plugins (overwrite existing clones)
+zsh_custom="${ZSH_CUSTOM:-${ZSH}/custom}"
+rm -rf "${zsh_custom}/plugins/zsh-autosuggestions"
+git clone https://github.com/zsh-users/zsh-autosuggestions "${zsh_custom}/plugins/zsh-autosuggestions"
 
-git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+rm -rf "${zsh_custom}/plugins/zsh-syntax-highlighting"
+git clone https://github.com/zsh-users/zsh-syntax-highlighting "${zsh_custom}/plugins/zsh-syntax-highlighting"
+
+rm -rf "${homedir}/.tmux/plugins/tpm"
+git clone https://github.com/tmux-plugins/tpm "${homedir}/.tmux/plugins/tpm"
