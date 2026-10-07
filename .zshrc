@@ -128,6 +128,9 @@ function g() {
     fi
 }
 
+# Review a GitHub PR in a temporary worktree with nvim, Pi /review, and lazygit.
+alias gr='zsh "$HOME/dotfiles/scripts/pr-review.zsh"'
+
 # Custom completions (must be before compinit)
 fpath=(~/.zsh/completions $fpath)
 
