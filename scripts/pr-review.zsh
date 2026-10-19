@@ -37,9 +37,10 @@ local worktree="$root/pr-$number"
 local session="gr-${owner}-${repo//./_}-${number}"
 mkdir -p "${clone:h}" "${worktree:h}" || exit 1
 if [[ ! -e "$clone" ]]; then
-    gh repo clone "$owner/$repo" "$clone" -- --no-checkout || exit 1
+    git clone --no-checkout "git@github.com:$owner/$repo.git" "$clone" || exit 1
 fi
 git -C "$clone" rev-parse --git-dir >/dev/null || exit 1
+git -C "$clone" remote set-url origin "git@github.com:$owner/$repo.git" || exit 1
 git -C "$clone" fetch origin \
     "+refs/pull/$number/head:refs/remotes/origin/pr/$number" \
     "+refs/heads/${base}:refs/remotes/origin/$base" || exit 1
@@ -63,12 +64,7 @@ fi
 local remote=origin
 if [[ "${head_repo:l}" != "${owner:l}/${repo:l}" ]]; then
     remote="pr-$number"
-    local origin_url head_url
-    origin_url=$(git -C "$clone" remote get-url origin) || exit 1
-    case "$origin_url" in
-        git@*|ssh://*) head_url="git@github.com:$head_repo.git" ;;
-        *) head_url="https://github.com/$head_repo.git" ;;
-    esac
+    local head_url="git@github.com:$head_repo.git"
     if git -C "$clone" remote get-url "$remote" >/dev/null 2>&1; then
         git -C "$clone" remote set-url "$remote" "$head_url" || exit 1
     else
